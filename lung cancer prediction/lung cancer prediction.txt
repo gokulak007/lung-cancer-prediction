@@ -1,0 +1,181 @@
+
+# IMPORTANT: RUN THIS CELL IN ORDER TO IMPORT YOUR KAGGLE DATA SOURCES
+# TO THE CORRECT LOCATION (/kaggle/input) IN YOUR NOTEBOOK,
+# THEN FEEL FREE TO DELETE THIS CELL.
+# NOTE: THIS NOTEBOOK ENVIRONMENT DIFFERS FROM KAGGLE'S PYTHON
+# ENVIRONMENT SO THERE MAY BE MISSING LIBRARIES USED BY YOUR
+# NOTEBOOK.
+
+import os
+import sys
+from tempfile import NamedTemporaryFile
+from urllib.request import urlopen
+from urllib.parse import unquote, urlparse
+from urllib.error import HTTPError
+from zipfile import ZipFile
+import tarfile
+import shutil
+
+CHUNK_SIZE = 40960
+DATA_SOURCE_MAPPING = 'cancer-patients-and-air-pollution-a-new-link:https%3A%2F%2Fstorage.googleapis.com%2Fkaggle-data-sets%2F2636109%2F4510352%2Fbundle%2Farchive.zip%3FX-Goog-Algorithm%3DGOOG4-RSA-SHA256%26X-Goog-Credential%3Dgcp-kaggle-com%2540kaggle-161607.iam.gserviceaccount.com%252F20240723%252Fauto%252Fstorage%252Fgoog4_request%26X-Goog-Date%3D20240723T165825Z%26X-Goog-Expires%3D259200%26X-Goog-SignedHeaders%3Dhost%26X-Goog-Signature%3Dbc6ccb2f231e2f6b7ab479c7c25db952b9c14a8f18619cc3903b94b54358e17dc5a6214f6e37791279420d589ecfc3fd3c6f6d5d28fc4f36f7c461ca52a2e8c1f1eb10d9d0ea29f4db5ff8e8280733c2f1e02e3464ec35da0cdb864d92e36516121ba8caa37cb86c6019c8adc1e8d2778cb24f57f1f0377fa4fabb058a0c17d5a10c0415796da21a0ed6bea8b94599ec394f84128d8b6efa83254f705bc9cc8fa3c2883c6db5b7c9b37ecc6a3392634908e16f10b9a8ddcf004ef2a289b314f9aaa4b6d98268c3f851ee001c7d7b44d18582643dd0100c2856d2bfb88eab59a26876efac1ee9396ad9dedfa6988f3598bd339c68b49e779635a3c1fd4db040d8'
+
+KAGGLE_INPUT_PATH='/kaggle/input'
+KAGGLE_WORKING_PATH='/kaggle/working'
+KAGGLE_SYMLINK='kaggle'
+
+!umount /kaggle/input/ 2> /dev/null
+shutil.rmtree('/kaggle/input', ignore_errors=True)
+os.makedirs(KAGGLE_INPUT_PATH, 0o777, exist_ok=True)
+os.makedirs(KAGGLE_WORKING_PATH, 0o777, exist_ok=True)
+
+try:
+  os.symlink(KAGGLE_INPUT_PATH, os.path.join("..", 'input'), target_is_directory=True)
+except FileExistsError:
+  pass
+try:
+  os.symlink(KAGGLE_WORKING_PATH, os.path.join("..", 'working'), target_is_directory=True)
+except FileExistsError:
+  pass
+
+for data_source_mapping in DATA_SOURCE_MAPPING.split(','):
+    directory, download_url_encoded = data_source_mapping.split(':')
+    download_url = unquote(download_url_encoded)
+    filename = urlparse(download_url).path
+    destination_path = os.path.join(KAGGLE_INPUT_PATH, directory)
+    try:
+        with urlopen(download_url) as fileres, NamedTemporaryFile() as tfile:
+            total_length = fileres.headers['content-length']
+            print(f'Downloading {directory}, {total_length} bytes compressed')
+            dl = 0
+            data = fileres.read(CHUNK_SIZE)
+            while len(data) > 0:
+                dl += len(data)
+                tfile.write(data)
+                done = int(50 * dl / int(total_length))
+                sys.stdout.write(f"\r[{'=' * done}{' ' * (50-done)}] {dl} bytes downloaded")
+                sys.stdout.flush()
+                data = fileres.read(CHUNK_SIZE)
+            if filename.endswith('.zip'):
+              with ZipFile(tfile) as zfile:
+                zfile.extractall(destination_path)
+            else:
+              with tarfile.open(tfile.name) as tarfile:
+                tarfile.extractall(destination_path)
+            print(f'\nDownloaded and uncompressed: {directory}')
+    except HTTPError as e:
+        print(f'Failed to load (likely expired) {download_url} to path {destination_path}')
+        continue
+    except OSError as e:
+        print(f'Failed to load {download_url} to path {destination_path}')
+        continue
+
+print('Data source import complete.')
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+df=pd.read_csv('/kaggle/input/cancer-patients-and-air-pollution-a-new-link/cancer patient data sets.csv')
+
+df.head()
+df.info()
+df.describe()
+df.isnull().sum()
+df.columns
+df=df[['Age', 'Gender', 'Air Pollution', 'Alcohol use',
+       'Dust Allergy', 'OccuPational Hazards', 'Genetic Risk',
+       'chronic Lung Disease', 'Balanced Diet', 'Obesity', 'Smoking',
+       'Passive Smoker', 'Chest Pain', 'Coughing of Blood', 'Fatigue',
+       'Weight Loss', 'Shortness of Breath', 'Wheezing',
+       'Swallowing Difficulty', 'Clubbing of Finger Nails', 'Frequent Cold',
+       'Dry Cough', 'Snoring', 'Level']]
+df.head()
+df['Level'].value_counts()
+df=df.replace({'Level':{'Low': 1, 'Medium': 2, 'High': 3}})
+df.head()
+import seaborn as sns
+sns.set()
+plt.figure(figsize = (18,9))
+sns.heatmap(df.corr(), cmap='GnBu', annot=True)
+plt.show()
+df['Smoking'].corr(df['Passive Smoker'])
+sns.heatmap(df.corr()[['Level']].sort_values(by='Level', ascending=False), vmin=-1, vmax=1, annot=True, cmap='GnBu')
+df.columns
+df=df[['Age','Coughing of Blood','Dust Allergy','Passive Smoker','OccuPational Hazards','Air Pollution','chronic Lung Disease','Shortness of Breath','Dry Cough','Snoring','Swallowing Difficulty','Level']]
+df.head()
+df['Level'].value_counts()
+X=df.drop('Level',axis=1)
+
+y=df['Level']
+from sklearn.model_selection import train_test_split
+X_train,X_test,y_train,y_test=train_test_split(X,y,test_size=0.30,random_state=1)
+from sklearn.linear_model import LogisticRegression
+Classifier = LogisticRegression(solver='liblinear')
+Classifier.fit(X_train,y_train)
+y_test_hat = Classifier.predict(X_test)
+Results = pd.DataFrame({'Actual':y_test,'Predictions':y_test_hat})
+Results.head(10)
+from sklearn.metrics import accuracy_score
+print(accuracy_score(y_test,y_test_hat))
+y_train_hat = Classifier.predict(X_train)
+
+print(accuracy_score(y_train,y_train_hat))
+y_test_hat_proba = Classifier.predict_proba(X_test)
+
+print(y_test_hat_proba.shape)
+y_test_hat_proba[0:5,:]
+array_in_scientific = y_test_hat_proba[0:5,:]
+
+# Convert to normal number format
+array_in_normal = np.vectorize(lambda x: format(x, '.16f'))(array_in_scientific)
+
+print(array_in_normal)
+
+pls = y_test_hat_proba[:,1]
+
+Results = pd.DataFrame({'Actual':y_test,'Predictions':y_test_hat,'Prob(Class = 3)':pls})
+
+Results.head(5)
+from sklearn.metrics import confusion_matrix
+
+cm = confusion_matrix(y_test,y_test_hat)
+
+print(cm)
+import seaborn as sn
+plt.figure(figsize = (10,7))
+sn.heatmap(cm, annot=True)
+plt.title('Confusion Matrix - Test Data')
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+
+from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score, confusion_matrix, ConfusionMatrixDisplay, classification_report
+
+def perform(y_pred):
+    print("Precision : ", precision_score(y_test, y_test_hat, average = 'micro'))
+    print("Recall : ", recall_score(y_test, y_test_hat, average = 'micro'))
+    print("Accuracy : ", accuracy_score(y_test, y_test_hat))
+    print("F1 Score : ", f1_score(y_test, y_test_hat, average = 'micro'))
+    cm = confusion_matrix(y_test, y_pred)
+    print("\n", cm)
+    print("\n")
+    print("**"*27 + "\n" + " "* 16 + "Classification Report\n" + "**"*27)
+    print(classification_report(y_test, y_test_hat))
+    print("**"*27+"\n")
+
+    cm = ConfusionMatrixDisplay(confusion_matrix = cm, display_labels=['Low', 'Medium', 'High'])
+    cm.plot()
+
+perform(y_test_hat)
+
+from sklearn.metrics import classification_report
+print(classification_report(y_test,y_test_hat))
